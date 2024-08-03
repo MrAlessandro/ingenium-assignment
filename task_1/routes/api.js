@@ -1,5 +1,8 @@
+require("dotenv").config();
+
 var express = require("express");
 var router = express.Router();
+
 const axios = require("axios");
 const axiosRetry = require("axios-retry").default;
 const utils = require("../utils/utils");
