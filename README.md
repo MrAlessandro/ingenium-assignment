@@ -1,3 +1,5 @@
+# Weather API server
+
 The code snippet below serves as a foundation for a basic weather endpoint that returns current weather data for a given city. Your task is to enhance this code by addressing the following areas:
 
 1. Error Handling and User Experience: Implement robust error handling, providing clear and informative messages to users. Consider incorporating retry logic for API failures.
