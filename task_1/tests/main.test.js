@@ -1,9 +1,8 @@
 const request = require("supertest");
+const app = require("../app"); // Replace '../app' with the path to your Express app file
+const cache = require("../cache");
+const utils = require("../utils/utils");
 const axios = require("axios");
-const app = require("../src/main");
-const utils = require("../src/utils");
-const cache = app.cache;
-const server = app.server;
 
 jest.mock("axios");
 
@@ -14,9 +13,7 @@ describe("Weather API", () => {
     cache.flushAll();
   });
 
-  afterAll(() => {
-    server.close();
-  });
+  afterAll(() => {});
 
   it("should return weather data for a valid city", async () => {
     axios.mockImplementation(() =>
@@ -33,7 +30,7 @@ describe("Weather API", () => {
       })
     );
 
-    const response = await request(app).get("/weather/New York");
+    const response = await request(app).get("/api/weather/New York");
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       temperature: 75,
@@ -57,11 +54,9 @@ describe("Weather API", () => {
       })
     );
 
-    const response = await request(app).get("/weather/Invalid City");
-    console.log(response.body);
+    const response = await request(app).get("/api/weather/Invalid City");
     expect(response.status).toBe(404);
     expect(response.body).toEqual({
-      code: "CITY_NOT_FOUND",
       error: "City requested not found",
     });
   });
@@ -79,7 +74,7 @@ describe("Weather API", () => {
     // Store the result in the cache
     cache.set(cacheKey, weatherData);
 
-    const response = await request(app).get(`/weather/${cityName}`);
+    const response = await request(app).get(`/api/weather/${cityName}`);
     expect(response.status).toBe(200);
     expect(response.body).toEqual(weatherData);
   });
@@ -100,10 +95,9 @@ describe("Weather API", () => {
       })
     );
 
-    const response = await request(app).get("/weather/London");
+    const response = await request(app).get("/api/weather/London");
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
-      code: "EXT_API_ERROR",
       error: "Weather data unavailable at the moment. Please try again later.",
     });
   });

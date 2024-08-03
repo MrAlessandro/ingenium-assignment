@@ -1,6 +1,3 @@
-const CodedError = require("./errors");
-
-// Slugify a string
 const cacheableKey = (str) =>
   String(str)
     .normalize("NFKD") // split accented characters into their base characters and diacritical marks
@@ -13,14 +10,16 @@ const cacheableKey = (str) =>
 
 const sanitizeCityInput = (city) => {
   if (typeof city !== "string") {
-    throw new CodedError("INVALID_CITY", 400, "Invalid city name");
+    let error = new Error("City name must be a string");
+    error.status = 400;
+    throw error;
   }
 
   /*
-  a-zA-Z: matches any letter from a to z, both lowercase and uppercase
-  \s: matches any whitespace character, including spaces and tabs
-  \u00C0-\u024F: Include most accented characters
-  */
+    a-zA-Z: matches any letter from a to z, both lowercase and uppercase
+    \s: matches any whitespace character, including spaces and tabs
+    \u00C0-\u024F: Include most accented characters
+    */
   let sanitizedCity = city
     .normalize("NFD")
     .replace(/[^a-zA-Z\s\u00C0-\u024F'-]/g, "")
@@ -29,24 +28,15 @@ const sanitizeCityInput = (city) => {
   const minLength = 2; // Minimum length of city name
   const maxLength = 100; // Maximum length of city name
   if (sanitizedCity.length < minLength || sanitizedCity.length > maxLength) {
-    throw new CodedError("INVALID_CITY", 400, "Invalid city name length");
+    let error = new Error("Invalid city name length");
+    error.status = 400;
+    throw error;
   }
 
   return sanitizedCity;
 };
 
-const logRequest = (req) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${req.method.toUpperCase()} ${req.url}`);
-};
-
-const logResponse = (res) => {
-  console.log(`\t${res.statusCode} - ${res.statusMessage}`);
-};
-
 module.exports = {
   cacheableKey,
   sanitizeCityInput,
-  logRequest,
-  logResponse,
 };

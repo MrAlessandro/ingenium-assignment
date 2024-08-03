@@ -1,7 +1,9 @@
-require("dotenv").config();
-const CodedError = require("./errors");
+var express = require("express");
+var router = express.Router();
 const axios = require("axios");
 const axiosRetry = require("axios-retry").default;
+const utils = require("../utils/utils");
+const cache = require("../cache");
 
 // Configure axios to use axios-retry
 axiosRetry(axios, {
@@ -19,8 +21,10 @@ axiosRetry(axios, {
 });
 
 const fetchWeatherData = async (city, timeout = 9000) => {
+  let error;
+  let response;
   try {
-    const response = await axios({
+    response = await axios({
       method: "get",
       url: `https://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${city}`,
       timeout: timeout, // overall timeout for all retries
@@ -29,38 +33,14 @@ const fetchWeatherData = async (city, timeout = 9000) => {
         Accept: "application/json",
       },
     });
-    const { temp_c, condition, humidity, wind_kph, uv } = response.data.current;
-    if (!temp_c || !condition?.text || !humidity || !wind_kph || !uv) {
-      throw new CodedError(
-        CodedError.API_ERROR,
-        500,
-        "Something went wrong during elaboration of the request"
-      );
-    }
-
-    let data = {
-      temperature: temp_c,
-      condition: condition.text,
-      humidity,
-      wind: wind_kph,
-      uv,
-    };
-    return data;
-  } catch (error) {
-    if (error instanceof CodedError) {
-      // Re-throw known errors
-      throw error;
-    }
+  } catch (e) {
     // Handle timeout error
-    if (error instanceof axios.AxiosError && error.code === "ECONNABORTED") {
-      throw new CodedError(
-        CodedError.EXT_API_ERROR,
-        500,
-        "Weather data unavailable at the moment. Please try again later.",
-        error.message
+    if (e instanceof axios.AxiosError && e.code === "ECONNABORTED") {
+      error = new Error(
+        "Weather data unavailable at the moment. Please try again later."
       );
-    }
-    if (error.response.data.error) {
+      error.status = 504;
+    } else if (e.response.data.error) {
       /*
        * From WheatherAPI documentation:
        * Status code: "401" - Error code: "1002" -> "API key not provided."
@@ -75,49 +55,78 @@ const fetchWeatherData = async (city, timeout = 9000) => {
        * Status code: "400" - Error code: "9001" -> "Json body contains too many locations for bulk request. Please keep it below 50 in a single request."
        * Status code: "400" - Error code: "9999" -> "Internal application error."
        */
-      switch (error.response.data.error.code) {
+      switch (e.response.data.error.code) {
         case 1005:
         case 2006:
         case 2007:
         case 2008:
         case 2009:
         case 9999:
-          throw new CodedError(
-            CodedError.EXT_API_ERROR,
-            500,
-            "Weather data unavailable at the moment. Please try again later.",
-            error.message
+          error = new Error(
+            "Weather data unavailable at the moment. Please try again later."
           );
+          error.status = 500;
+          break;
         case 1006:
-          throw new CodedError(
-            CodedError.CITY_NOT_FOUND,
-            404,
-            "City requested not found",
-            error.message
-          );
-        case 9000:
-        case 9001:
-        case 1003:
-        case 1002:
+          error = new Error("City requested not found");
+          error.status = 404;
+          break;
         default:
-          throw new CodedError(
-            CodedError.API_ERROR,
-            500,
-            "Something went wrong during elaboration of the request",
-            error.message
+          error = new Error(
+            "Something went wrong during elaboration of the request"
           );
+          error.status = 500;
       }
+    } else {
+      // Handle other errors
+      error = new Error(
+        "Something went wrong during elaboration of the request"
+      );
+      error.status = 500;
     }
-    // Handle other errors
-    throw new CodedError(
-      CodedError.API_ERROR,
-      500,
-      "Something went wrong during elaboration of the request",
-      error.message
-    );
   }
+  if (error) {
+    throw error;
+  }
+
+  const { temp_c, condition, humidity, wind_kph, uv } = response.data.current;
+  if (!temp_c || !condition?.text || !humidity || !wind_kph || !uv) {
+    error = new Error("Something went wrong during elaboration of the request");
+    error.status = 500;
+    throw error;
+  }
+
+  return {
+    temperature: temp_c,
+    condition: condition.text,
+    humidity,
+    wind: wind_kph,
+    uv,
+  };
 };
 
-module.exports = {
-  fetchWeatherData,
-};
+// Endpoint to get weather data for a given city
+router.get("/weather/:city", async (req, res, next) => {
+  try {
+    const cityName = utils.sanitizeCityInput(req.params.city);
+    const cacheKey = utils.cacheableKey(cityName);
+
+    // Check if the data is in the cache
+    if (cache.has(cacheKey)) {
+      return res.json(cache.get(cacheKey));
+    }
+
+    // Fetch weather data from the external API
+    const weatherData = await fetchWeatherData(cityName);
+
+    // Store the result in the cache
+    cache.set(cacheKey, weatherData);
+
+    // Return the weather data
+    res.status(200).json(weatherData);
+  } catch (error) {
+    next(error);
+  }
+});
+
+module.exports = router;
