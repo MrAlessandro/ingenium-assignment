@@ -102,9 +102,9 @@ const fetchWeatherData = async (city, timeout = 9000) => {
   return {
     temperature: temp_c,
     condition: condition.text,
-    humidity,
+    humidity: humidity,
     wind: wind_kph,
-    uv,
+    uv: uv,
   };
 };
 
