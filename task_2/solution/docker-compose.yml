@@ -7,6 +7,9 @@ services:
       - postgres_data:/var/lib/postgresql/data/
     env_file:
       - ./.env
+  memcached:
+    restart: always
+    image: "memcached:1.6.9-alpine"
   redis:
     restart: always
     image: "redis:7.2.4-alpine"
@@ -22,6 +25,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - memcached
   celery_beat:
     restart: always
     build:
@@ -31,6 +35,8 @@ services:
       - ./.env
     depends_on:
       - redis
+      - postgres
+      - memcached
   nginx:
     restart: always
     image: "nginx:1.27.0-alpine"
