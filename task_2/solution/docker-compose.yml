@@ -1,21 +1,43 @@
 version: "3.3"
 services:
-  backend:
-    build: .
-    command: gunicorn backend.wsgi -b :5001 --workers=2
+  postgres:
+    restart: always
+    image: "postgres:15-alpine"
     volumes:
-      - db.sqlite3:/code/db.sqlite3
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - ./.env
   redis:
     restart: always
-    image: redis:6.2.13-alpine
-  celery:
+    image: "redis:7.2.4-alpine"
+  backend:
     restart: always
-    container_name: mei_celery
-    build: .
-    command: celery -A core worker -B -l info
+    build:
+      context: .
+    command: gunicorn sampler.wsgi:application --bind 0.0.0.0:8000
+    ports:
+      - 8000:8000
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+  celery_beat:
+    restart: always
+    build:
+      context: .
+    command: celery -A sampler beat -l info
+    env_file:
+      - ./.env
     depends_on:
       - redis
+  nginx:
+    restart: always
+    image: "nginx:1.27.0-alpine"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - 80:80
 
 volumes:
   postgres_data:
-  backups_volumes:

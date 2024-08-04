@@ -1,20 +1,25 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim
+# Use the official Python base image
+FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y python3-pip python3-cffi python3-brotli libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0
-
-# Set environment varibles
+# set environment variables
+ENV SHELL /bin/bash
+ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-COPY ./requirements.txt /code/requirements.txt
-RUN pip install --upgrade pip
-# Install any needed packages specified in requirements.txt
-RUN pip install -r /code/requirements.txt
+# Set the working directory in the container
+WORKDIR /app
+
+COPY requirements.txt /app/
+
+RUN pip install -r requirements.txt
 RUN pip install gunicorn
 
-# Copy the current directory contents into the container at /code/
-COPY . /code/
-WORKDIR /code/
+# Copy current workdir to the container
+COPY . /app/
 
-RUN chmod +x /code/entrypoint.sh
-ENTRYPOINT ["/code/entrypoint.sh"]
+# Install the Python dependencies
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT [ "/app/entrypoint.sh" ]

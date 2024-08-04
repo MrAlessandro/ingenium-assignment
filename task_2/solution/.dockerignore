@@ -1,0 +1,8 @@
+venv/
+.vscode/
+celerybeat-schedule.db
+.git
+.gitignore
+.env
+.env.example
+*.md
